@@ -5,6 +5,7 @@ author        = "Termer"
 description   = "TwineMedia API client library for Nim"
 license       = "MIT"
 srcDir        = "src"
+bin           = "tm_client"
 
 [Deps]
 Requires: "nim >= 1.4.6"

@@ -1,11 +1,11 @@
 # Package
 
+name          = "tm_client"
 version       = "0.1.0"
-author        = "="
+author        = "Termer"
 description   = "TwineMedia API client library for Nim"
 license       = "MIT"
 srcDir        = "src"
-bin           = @["tm_client"]
 
 # Dependencies
 

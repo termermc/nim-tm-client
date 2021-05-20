@@ -233,7 +233,7 @@ method request*(this: TMClient, httpMethod: HttpMethod, path: string, data: Json
     
     return await this.handleApiResponse(http, httpRes)
 
-method uploadFile(
+method uploadFile*(
         this: TMClient,
         path: string,
         name: Option[string] = none[string](),
@@ -276,7 +276,7 @@ method uploadFile(
     # Return new file's ID
     return res["id"].getStr
 
-method createStandardList(this: TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[void] {.base, async.} =
+method createStandardList*(this: TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[void] {.base, async.} =
     ## Create a new standard list
     
     discard await this.request(HttpPost, "/lists/create", %*{
@@ -286,7 +286,7 @@ method createStandardList(this: TMClient, id: string, name: string, description:
         "visibility": visibility.ord
     })
 
-method createAutomaticallyPopulatedList(
+method createAutomaticallyPopulatedList*(
         this: TMClient,
         id: string,
         name: string,
@@ -323,7 +323,7 @@ method createAutomaticallyPopulatedList(
     
     discard await this.request(HttpPost, "/lists/create", body)
 
-method fetchSelfAccountInfo(this: TMClient): Future[TMSelfAccountInfo] {.base, async.} =
+method fetchSelfAccountInfo*(this: TMClient): Future[TMSelfAccountInfo] {.base, async.} =
     ## Fetches this client's account info (and stores in the client account property)
 
     let info = await this.request(HttpGet, "/account/info")
@@ -345,7 +345,7 @@ method fetchSelfAccountInfo(this: TMClient): Future[TMSelfAccountInfo] {.base, a
 
     return account
 
-method fetchInstanceInfo(this: TMClient): Future[TMInstanceInfo] {.base, async.} =
+method fetchInstanceInfo*(this: TMClient): Future[TMInstanceInfo] {.base, async.} =
     ## Fetches information about this TwineMedia instance
 
     let info = await this.request(HttpGet, "/info")
@@ -354,12 +354,12 @@ method fetchInstanceInfo(this: TMClient): Future[TMInstanceInfo] {.base, async.}
         apiVersions: info["api_versions"].jsonArrayToStringSeq
     )
 
-method fetchMediaById(this: TMClient, id: string): Future[TMMedia] {.base, async.} =
+method fetchMediaById*(this: TMClient, id: string): Future[TMMedia] {.base, async.} =
     ## Fetches the media file with the specified ID, otherwises raises MediaNotFoundError
 
     return this.mediaJsonToObj(await this.request(HttpGet, "/media/"&id))
 
-method fetchMedia(this: TMClient, offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
+method fetchMedia*(this: TMClient, offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
     ## Fetches all media
     
     let files = (await this.request(HttpGet, "/media", %*{
@@ -373,7 +373,7 @@ method fetchMedia(this: TMClient, offset: int = 0, limit: int = 100, order: TMMe
     
     return res
 
-method fetchMediaByPlaintextSearch(
+method fetchMediaByPlaintextSearch*(
         this: TMClient,
         query: string,
         searchNames: bool = true,
@@ -402,7 +402,7 @@ method fetchMediaByPlaintextSearch(
     
     return res
 
-method fetchMediaByTags(this: TMClient, tags: seq[string], excludeTags: seq[string] = @[], offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
+method fetchMediaByTags*(this: TMClient, tags: seq[string], excludeTags: seq[string] = @[], offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
     ## Fetches all media that contain the specified tags (and don't contain the specified excluded tags)
     
     let files = (await this.request(HttpGet, "/media/tags", %*{
@@ -418,7 +418,7 @@ method fetchMediaByTags(this: TMClient, tags: seq[string], excludeTags: seq[stri
     
     return res
 
-method fetchMediaByList(this: TMClient, list: string, offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
+method fetchMediaByList*(this: TMClient, list: string, offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
     ## Fetches all media in the specified list
     
     let files = (await this.request(HttpGet, "/media/list/"&list, %*{
@@ -432,7 +432,7 @@ method fetchMediaByList(this: TMClient, list: string, offset: int = 0, limit: in
     
     return res
 
-method fetchTags(this: TMClient, query: string = "", offset: int = 0, limit: int = 100, order: TMTagOrder = TagNameAsc): Future[seq[TMTag]] {.base, async.} =
+method fetchTags*(this: TMClient, query: string = "", offset: int = 0, limit: int = 100, order: TMTagOrder = TagNameAsc): Future[seq[TMTag]] {.base, async.} =
     ## Fetchs all tags (optionally matching the specified query, using "%" as a wildcard)
     
     let tagElems = (await this.request(HttpGet, "/tags", %*{
@@ -449,12 +449,12 @@ method fetchTags(this: TMClient, query: string = "", offset: int = 0, limit: int
 
     return tags
 
-method fetchListById(this: TMClient, id: string): Future[TMList] {.base, async.} =
+method fetchListById*(this: TMClient, id: string): Future[TMList] {.base, async.} =
     ## Fetches a list's info by its ID
     
     return this.listJsonToObj(await this.request(HttpGet, "/list/"&id))
 
-method fetchLists(
+method fetchLists*(
         this: TMClient,
         listType: Option[TMListType] = none[TMListType](),
         containsMedia: Option[string] = none[string](),
@@ -483,7 +483,7 @@ method fetchLists(
     
     return lists
 
-method fetchListsByPlaintextSearch(
+method fetchListsByPlaintextSearch*(
         this: TMClient,
         query: string,
         searchNames: bool = true,
@@ -518,7 +518,7 @@ method fetchListsByPlaintextSearch(
     
     return lists
 
-method editFile(
+method editFile*(
         this: TMClient,
         id: string,
         name: Option[string] = none[string](),
@@ -542,7 +542,7 @@ method editFile(
     # Edit file
     discard await this.request(HttpPost, "/media/"&id&"/edit", body)
 
-method editListAsStandard(this: TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[void] {.base, async.} =
+method editListAsStandard*(this: TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[void] {.base, async.} =
     ## Edits a list as a standard list (calling this on an automatically populated list will convert it into a standard list)
     
     discard await this.request(HttpPost, "/list/"&id&"/edit", %*{
@@ -552,7 +552,7 @@ method editListAsStandard(this: TMClient, id: string, name: string, description:
         "visibility": visibility.ord
     })
 
-method editListAsAutomaticallyPopulated(
+method editListAsAutomaticallyPopulated*(
         this: TMClient,
         id: string,
         name: string,
@@ -589,22 +589,22 @@ method editListAsAutomaticallyPopulated(
     
     discard await this.request(HttpPost, "/list/"&id&"/edit", body)
 
-method deleteFile(this: TMClient, id: string): Future[void] {.base, async.} =
+method deleteFile*(this: TMClient, id: string): Future[void] {.base, async.} =
     ## Deletes a file
     
     discard await this.request(HttpPost, "/file/"&id&"/delete")
 
-method deleteList(this: TMClient, id: string): Future[void] {.base, async.} =
+method deleteList*(this: TMClient, id: string): Future[void] {.base, async.} =
     ## Deletes a list
     
     discard await this.request(HttpPost, "/list/"&id&"/delete")
 
-method addFileToList(this: TMClient, file: string, list: string): Future[void] {.base, async.} =
+method addFileToList*(this: TMClient, file: string, list: string): Future[void] {.base, async.} =
     ## Adds a media file to a list
     
     discard await this.request(HttpPost, "/list/"&list&"/add/"&file)
 
-method removeFileFromList(this: TMClient, file: string, list: string): Future[void] {.base, async.} =
+method removeFileFromList*(this: TMClient, file: string, list: string): Future[void] {.base, async.} =
     ## Removes a media file from a list
     
     discard await this.request(HttpPost, "/list/"&list&"/remove/"&file)

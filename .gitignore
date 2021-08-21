@@ -3,3 +3,4 @@ nimblecache/
 htmldocs/
 *.out
 /tm_client
+/tests/test1

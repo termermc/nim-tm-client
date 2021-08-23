@@ -9,10 +9,10 @@ import cgi
 import options
 import times
 
-include "tm_client/private/enums.nim"
-include "tm_client/private/exceptions.nim"
-include "tm_client/private/objects.nim"
-include "tm_client/private/utils.nim"
+import tm_client/private/enums
+import tm_client/private/exceptions
+import tm_client/private/objects
+import tm_client/private/utils
 
 proc hasPermission*(perms: seq[string], permission: string): bool =
     ## Returns whether the specified permission is in the provided array of permissions

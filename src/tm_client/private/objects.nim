@@ -39,6 +39,9 @@ type
         isProcessing*: bool
         processError*: string
         description*: string
+        source*: int
+        sourceType*: string
+        sourceName*: string
         parent*: seq[TMMedia]
         children*: seq[TMMedia]
 
@@ -74,3 +77,58 @@ type
         showAllUserFiles*: Option[bool]
         itemCount*: Option[int]
         containsMedia*: Option[bool]
+    
+    TMSource* = object
+        ## Stores information about a TwineMedia source
+        
+        id*: int
+        sourceType*: string
+        sourceTypeName*: string
+        name*: string
+        creatorId*: int
+        creatorName*: string
+        isGlobal*: bool
+        mediaCount*: int
+        config*: JsonNode
+        schema*: JsonNode
+        remainingStorage*: Option[int64]
+        createdOn*: DateTime
+    
+    TMSourceInfo* = object
+        ## Stores basic information about a TwineMedia source
+        
+        id*: int
+        sourceType*: string
+        name*: string
+        creatorId*: int
+        creatorName*: string
+        isGlobal*: bool
+        mediaCount*: int
+        createdOn*: DateTime
+    
+    TMSourceType* = object
+        ## Stores information about a TwineMedia source type
+        
+        sourceType*: string
+        name*: string
+        description*: string
+        schema*: JsonNode
+
+    TMTask* = object
+        ## Stores information about a TwineMedia task
+        
+        id*: int
+        name*: string
+        isCancellable*: bool
+        viewPermission*: Option[string]
+        cancelPermission*: Option[string]
+        isGlobal*: bool
+        progressType*: TMTaskProgressType
+        finishedItems*: int
+        totalItems*: Option[int]
+        subtask*: Option[string]
+        isSucceeded*: bool
+        isCancelled*: bool
+        isFailed*: bool
+        isCancelling*: bool
+        createdOn*: DateTime

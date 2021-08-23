@@ -42,3 +42,19 @@ type
         ListNameDesc = 3,
         ListModifiedOnDesc = 4,
         ListModifiedOnAsc = 5
+    
+    TMSourceOrder* = enum
+        ## Enum of orders that sources can be returned in
+        
+        SourceCreatedOnDesc = 0,
+        SourceCreatedOnAsc = 1,
+        SourceNameAsc = 2,
+        SourceNameDesc = 3,
+        SourceTypeAsc = 4,
+        SourceTypeDesc = 5
+    
+    TMTaskProgressType* = enum
+        ## Enum of task progress display types
+        
+        Percentage = "PERCENTAGE",
+        ItemCount = "ITEM_COUNT"

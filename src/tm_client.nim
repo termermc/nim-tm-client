@@ -101,6 +101,9 @@ method mediaJsonToObj(this: TMClient, json: JsonNode): TMMedia {.base.} =
         isProcessing: json["processing"].getBool,
         processError: json{"process_error"}.getStr(""),
         description: json{"description"}.getStr(""),
+        source: json{"source"}.getInt,
+        sourceType: json{"source_type"}.getStr(""),
+        sourceName: json{"source_name"}.getStr(""),
         children: children,
         parent: parent
     )
@@ -173,6 +176,96 @@ method listJsonToObj(this: TMClient, json: JsonNode): TMList {.base.} =
         containsMedia: containsMedia
     )
 
+method sourceJsonToObj(this: TMClient, json: JsonNode): TMSource {.base.} =
+    # Resolve optional values
+    let containsRemainingStorage = json{"remaining_storage"}
+    let remainingStorage = if containsRemainingStorage == nil or containsRemainingStorage.kind == JNull:
+        none[int64]()
+    else:
+        some(containsRemainingStorage.getBiggestInt)
+
+    # Create object
+    return TMSource(
+        id: json["id"].getInt,
+        sourceType: json["type"].getStr,
+        name: json["name"].getStr,
+        creatorId: json["creator"].getInt,
+        creatorName: json["creator_name"].getStr,
+        isGlobal: json["global"].getBool,
+        mediaCount: json["media_count"].getInt,
+        config: json["config"],
+        schema: json["schema"],
+        remainingStorage: remainingStorage,
+        createdOn: json["created_on"].getStr.isoStringToDateTime,
+    )
+
+method sourceInfoJsonToObj(this: TMClient, json: JsonNode): TMSourceInfo {.base.} =
+    # Create object
+    return TMSourceInfo(
+        id: json["id"].getInt,
+        sourceType: json["type"].getStr,
+        name: json["name"].getStr,
+        creatorId: json["creator"].getInt,
+        creatorName: json["creator_name"].getStr,
+        isGlobal: json["global"].getBool,
+        mediaCount: json["media_count"].getInt,
+        createdOn: json["created_on"].getStr.isoStringToDateTime,
+    )
+
+method sourceTypeJsonToObj(this: TMClient, json: JsonNode): TMSourceType {.base.} =
+    # Create object
+    return TMSourceType(
+        sourceType: json["type"].getStr,
+        name: json["name"].getStr,
+        description: json["description"].getStr,
+        schema: json["schema"]
+    )
+
+method taskJsonToObj(this: TMClient, json: JsonNode): TMTask {.base.} =
+    # Resolve optional values
+    let containsViewPermission = json{"view_permission"}
+    let viewPermission = if containsViewPermission == nil or containsViewPermission.kind == JNull:
+        none[string]()
+    else:
+        some(containsViewPermission.getStr)
+    
+    let containsCancelPermission = json{"cancel_permission"}
+    let cancelPermission = if containsCancelPermission == nil or containsCancelPermission.kind == JNull:
+        none[string]()
+    else:
+        some(containsCancelPermission.getStr)
+
+    let containsTotalItems = json{"total_items"}
+    let totalItems = if containsTotalItems == nil or containsTotalItems.kind == JNull:
+        none[int]()
+    else:
+        some(containsTotalItems.getInt)
+    
+    let containsSubtask = json{"subtask"}
+    let subtask = if containsSubtask == nil or containsSubtask.kind == JNull:
+        none[string]()
+    else:
+        some(containsSubtask.getStr)
+
+    # Create object
+    return TMTask(
+        id: json["id"].getInt,
+        name: json["name"].getStr,
+        isCancellable: json["cancellable"].getBool,
+        viewPermission: viewPermission,
+        cancelPermission: cancelPermission,
+        isGlobal: json["global"].getBool,
+        progressType: parseEnum[TMTaskProgressType](json["progress_type"].getStr),
+        finishedItems: json["finished_items"].getInt,
+        totalItems: totalItems,
+        subtask: subtask,
+        isSucceeded: json["succeeded"].getBool,
+        isCancelled: json["cancelled"].getBool,
+        isFailed: json["failed"].getBool,
+        isCancelling: json["cancelling"].getBool,
+        createdOn: json["created_on"].getStr.isoStringToDateTime,
+    )
+
 method handleApiResponse(this: TMClient, http: AsyncHttpClient, httpRes: AsyncResponse): Future[JsonNode] {.base, async.} =
     ## Takes in an HTTP response, validates it, and returns the body as JSON
 
@@ -240,7 +333,9 @@ method uploadFile*(
         description: Option[string] = none[string](),
         tags: Option[seq[string]] = none[seq[string]](),
         noThumbnail: bool = false,
-        doNotProcess: bool = false
+        doNotProcess: bool = false,
+        ignoreHash: bool = false,
+        source: Option[int] = none[int](),
     ): Future[string] {.base, async.} =
     ## Uploads a file and returns its ID
     
@@ -258,6 +353,10 @@ method uploadFile*(
         headers.add(("X-NO-THUMBNAIL", "true"))
     if doNotProcess:
         headers.add(("X-NO-PROCESS", "true"))
+    if ignoreHash:
+        headers.add(("X-IGNORE-HASH", "true"))
+    if source.isSome:
+        headers.add(("X-MEDIA-SOURCE", $source.get))
 
     # Setup multipart data
     let mimes = newMimetypes()
@@ -276,19 +375,20 @@ method uploadFile*(
     # Return new file's ID
     return res["id"].getStr
 
-method createStandardList*(this: TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[void] {.base, async.} =
+method createStandardList*(this: TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[string] {.base, async.} =
     ## Create a new standard list
     
-    discard await this.request(HttpPost, "/lists/create", %*{
+    let res = await this.request(HttpPost, "/lists/create", %*{
         "type": StandardList.ord,
         "name": name,
         "description": description,
         "visibility": visibility.ord
     })
 
+    return res["id"].getStr
+
 method createAutomaticallyPopulatedList*(
         this: TMClient,
-        id: string,
         name: string,
         description: string,
         visibility: TMListVisibility,
@@ -298,7 +398,7 @@ method createAutomaticallyPopulatedList*(
         sourceCreatedAfter: Option[DateTime] = none[DateTime](),
         sourceMime: Option[string] = none[string](),
         showAllUserFiles: Option[bool] = none[bool]()
-    ): Future[void] {.base, async.} =
+    ): Future[string] {.base, async.} =
     ## Creates a new automatically populated list
     
     # Put fields in body if present
@@ -321,7 +421,32 @@ method createAutomaticallyPopulatedList*(
     if showAllUserFiles.isSome:
         body.add("showAllUserFiles", newJBool(showAllUserFiles.get))
     
-    discard await this.request(HttpPost, "/lists/create", body)
+    let res = await this.request(HttpPost, "/lists/create", body)
+
+    return res["id"].getStr
+
+method createSource*(
+        this: TMClient,
+        name: string,
+        sourceType: string,
+        config: JsonNode,
+        testConfig: bool,
+        isGlobal: bool
+    ): Future[int] {.base, async.} =
+    ## Creates a new source
+    
+    # Put fields in body if present
+    let body = %*{
+        "name": name,
+        "type": sourceType,
+        "config": config,
+        "test": testConfig,
+        "global": isGlobal
+    }
+
+    let res = await this.request(HttpPost, "/sources/create", body)
+
+    return res["id"].getInt
 
 method fetchSelfAccountInfo*(this: TMClient): Future[TMSelfAccountInfo] {.base, async.} =
     ## Fetches this client's account info (and stores in the client account property)
@@ -518,13 +643,151 @@ method fetchListsByPlaintextSearch*(
     
     return lists
 
+method fetchSources*(
+        this: TMClient,
+        offset: int,
+        limit: int,
+        order: TMSourceOrder = SourceCreatedOnDesc
+    ): Future[seq[TMSourceInfo]] {.base, async.} =
+    ## Fetches sources' info
+    
+    # Add parameters
+    let body = %*{
+        "offset": offset,
+        "limit": limit,
+        "order": order.ord
+    }
+
+    # Get sources
+    let sourceElems = (await this.request(HttpGet, "/sources", body))["sources"].getElems
+    var sources = newSeq[TMSourceInfo](sourceElems.len)
+    for i, source in sourceElems:
+        sources[i] = this.sourceInfoJsonToObj(source)
+    
+    return sources
+
+method fetchSourcesByPlaintextSearch*(
+        this: TMClient,
+        query: string,
+        offset: int,
+        limit: int,
+        order: TMSourceOrder = SourceCreatedOnDesc
+    ): Future[seq[TMSourceInfo]] {.base, async.} =
+    ## Fetches sources' info by the specified plaintext search query
+    
+    # Add parameters
+    let body = %*{
+        "query": query,
+        "offset": offset,
+        "limit": limit,
+        "order": order.ord
+    }
+
+    # Get sources
+    let sourceElems = (await this.request(HttpGet, "/sources", body))["sources"].getElems
+    var sources = newSeq[TMSourceInfo](sourceElems.len)
+    for i, source in sourceElems:
+        sources[i] = this.sourceInfoJsonToObj(source)
+    
+    return sources
+
+method fetchSourcesByCreator*(
+    this: TMClient,
+        creator: int,
+        offset: int,
+        limit: int,
+        order: TMSourceOrder = SourceCreatedOnDesc
+    ): Future[seq[TMSourceInfo]] {.base, async.} =
+    ## Fetches sources' info by the specified creator ID
+    
+    # Add parameters
+    let body = %*{
+        "creator": creator,
+        "offset": offset,
+        "limit": limit,
+        "order": order.ord
+    }
+
+    # Get sources
+    let sourceElems = (await this.request(HttpGet, "/sources", body))["sources"].getElems
+    var sources = newSeq[TMSourceInfo](sourceElems.len)
+    for i, source in sourceElems:
+        sources[i] = this.sourceInfoJsonToObj(source)
+    
+    return sources
+
+method fetchSourcesByCreatorAndPlaintextSearch*(
+    this: TMClient,
+        creator: int,
+        query: string,
+        offset: int,
+        limit: int,
+        order: TMSourceOrder = SourceCreatedOnDesc
+    ): Future[seq[TMSourceInfo]] {.base, async.} =
+    ## Fetches sources' info by the specified creator ID and plaintext search query
+    
+    # Add parameters
+    let body = %*{
+        "creator": creator,
+        "query": query,
+        "offset": offset,
+        "limit": limit,
+        "order": order.ord
+    }
+
+    # Get sources
+    let sourceElems = (await this.request(HttpGet, "/sources", body))["sources"].getElems
+    var sources = newSeq[TMSourceInfo](sourceElems.len)
+    for i, source in sourceElems:
+        sources[i] = this.sourceInfoJsonToObj(source)
+    
+    return sources
+
+method fetchSourceById*(this: TMClient, id: int): Future[TMSource] {.base, async.} =
+    ## Fetches the source with the specified ID
+    
+    return this.sourceJsonToObj(await this.request(HttpGet, "/source/"&($id)))
+
+method fetchSourceTypes*(this: TMClient): Future[seq[TMSourceType]] {.base, async.} =
+    ## Fetches all available source types
+    
+    # Get types
+    let typeElems = (await this.request(HttpGet, "/sources/types"))["types"].getElems
+    var types = newSeq[TMSourceType](typeElems.len)
+    for i, sourceType in typeElems:
+        types[i] = this.sourceTypeJsonToObj(sourceType)
+    
+    return types
+
+method fetchSourceType*(this: TMClient, sourceType: string): Future[TMSourceType] {.base, async.} =
+    ## Fetches a specific source type's info
+    
+    return this.sourceTypeJsonToObj(await this.request(HttpGet, "/sources/type/"&sourceType))
+
+method fetchTasks*(this: TMClient): Future[seq[TMTask]] {.base, async.} =
+    ## Fetches all tasks visible to the client
+
+    # Get tasks
+    let taskElems = (await this.request(HttpGet, "/tasks"))["tasks"].getElems
+    var tasks = newSeq[TMTask](taskElems.len)
+    for i, task in taskElems:
+        tasks[i] = this.taskJsonToObj(task)
+    
+    return tasks
+
+method fetchTaskById*(this: TMClient, id: int): Future[TMTask] {.base, async.} =
+    ## Fetches the task with the specified ID
+    
+    return this.taskJsonToObj(await this.request(HttpGet, "/task/"&($id)))
+
 method editFile*(
         this: TMClient,
         id: string,
         name: Option[string] = none[string](),
         filename: Option[string] = none[string](),
         description: Option[string] = none[string](),
-        tags: Option[seq[string]] = none[seq[string]]()
+        tags: Option[seq[string]] = none[seq[string]](),
+        creator: Option[int] = none[int]()
     ): Future[void] {.base, async.} =
     ## Edits the file with the specified ID, changing properties if provided (name, filename, description, tags)
 
@@ -538,6 +801,8 @@ method editFile*(
         body.add("description", newJString(description.get))
     if tags.isSome:
         body.add("tags", tags.get.stringSeqToJsonArray)
+    if creator.isSome:
+        body.add("creator", newJInt(creator.get))
     
     # Edit file
     discard await this.request(HttpPost, "/media/"&id&"/edit", body)
@@ -565,7 +830,7 @@ method editListAsAutomaticallyPopulated*(
         sourceMime: Option[string] = none[string](),
         showAllUserFiles: Option[bool] = none[bool]()
     ): Future[void] {.base, async.} =
-    ## Edits a list as an automatically populated list (calling this on an automatically populated list will convert it into a standard list)
+    ## Edits a list as an automatically populated list (calling this on a standard list will convert it into an automatically populated list)
     
     # Put fields in body if present
     let body = %*{
@@ -589,6 +854,34 @@ method editListAsAutomaticallyPopulated*(
     
     discard await this.request(HttpPost, "/list/"&id&"/edit", body)
 
+method editSource*(
+        this: TMClient,
+        id: int,
+        name: Option[string] = none[string](),
+        config: Option[JsonNode] = none[JsonNode](),
+        creator: Option[int] = none[int](),
+        isGlobal: Option[bool] = none[bool](),
+        testConfig: bool = false,
+        forceEdit: bool = false
+    ): Future[void] {.base, async.} =
+    ## Edits a source
+    
+    # Put fields in body if present
+    let body = %*{
+        "test": testConfig,
+        "forceEdit": forceEdit
+    }
+    if name.isSome:
+        body.add("name", newJString(name.get))
+    if config.isSome:
+        body.add("config", config.get)
+    if creator.isSome:
+        body.add("creator", newJInt(creator.get))
+    if isGlobal.isSome:
+        body.add("global", newJBool(isGlobal.get))
+
+    discard await this.request(HttpPost, "/source/"&($id)&"/edit", body)
+
 method deleteFile*(this: TMClient, id: string): Future[void] {.base, async.} =
     ## Deletes a file
     
@@ -598,6 +891,22 @@ method deleteList*(this: TMClient, id: string): Future[void] {.base, async.} =
     ## Deletes a list
     
     discard await this.request(HttpPost, "/list/"&id&"/delete")
+
+method deleteSource*(
+        this: TMClient,
+        id: int,
+        forceDelete: bool = false,
+        deleteContents: bool = false
+    ): Future[void] {.base, async.} =
+    ## Deletes a source
+    
+    # Put fields in body
+    let body = %*{
+        "forceDelete": forceDelete,
+        "deleteContents": deleteContents
+    }
+
+    discard await this.request(HttpPost, "/source/"&($id)&"/delete", body)
 
 method addFileToList*(this: TMClient, file: string, list: string): Future[void] {.base, async.} =
     ## Adds a media file to a list
@@ -609,11 +918,22 @@ method removeFileFromList*(this: TMClient, file: string, list: string): Future[v
     
     discard await this.request(HttpPost, "/list/"&list&"/remove/"&file)
 
+method cancelTask*(this: TMClient, id: int): Future[void] {.base, async.} =
+    ## Requests that the task with the specified ID be cancelled
+    
+    discard await this.request(HttpPost, "/task/"&($id)&"/cancel")
+
 proc createClientWithToken*(rootUrl: string, token: string): TMClient =
     ## Creates a TwineMedia client with the provided root URL and token.
     ## Does not fetch account information, call fetchSelfAccountInfo(client) to fetch or update it.
     
     return TMClient(rootUrl: rootUrl.stripTrailingSlash, token: token)
+
+proc createAnonymousClient*(rootUrl: string): TMClient =
+    ## Creates a TwineMedia client the provided root URL, and a blank token
+    ## Is only able to perform anonymous requests, such as fetchInstanceInfo
+    
+    return TMClient(rootUrl: rootUrl.stripTrailingSlash, token: "")
 
 proc createClientWithEmail*(rootUrl: string, email: string, password: string): Future[TMClient] {.async.} =
     ## Creates a TwineMedia client with the providede root URL, email, and password.

@@ -15,8 +15,10 @@ type
         excludeOtherMedia*: bool
         excludeOtherLists*: bool
         excludeOtherProcesses*: bool
+        excludeOtherSources*: bool
         maxUploadSize*: int64
         isApiToken*: bool
+        defaultSource*: int
 
     TMMedia* = object
         ## Stores information about a media file.
@@ -131,4 +133,18 @@ type
         isCancelled*: bool
         isFailed*: bool
         isCancelling*: bool
+        createdOn*: DateTime
+    
+    TMAccount* = object
+        ## Stores information about a TwineMedia account
+        
+        id*: int
+        email*: string
+        name*: string
+        permissions*: seq[string]
+        isAdmin*: bool
+        defaultSource*: int
+        defaultSourceType*: string
+        defaultSourceName*: string
+        filesCreated*: int
         createdOn*: DateTime

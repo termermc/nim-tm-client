@@ -221,6 +221,21 @@ method sourceTypeJsonToObj(this: TMClient, json: JsonNode): TMSourceType {.base.
         schema: json["schema"]
     )
 
+method accountJsonToObj(this: TMClient, json: JsonNode): TMAccount {.base.} =
+    # Create object
+    return TMAccount(
+        id: json["id"].getInt,
+        email: json["email"].getStr,
+        name: json["name"].getStr,
+        permissions: json["permissions"].jsonArrayToStringSeq,
+        isAdmin: json["admin"].getBool,
+        defaultSource: json["default_source"].getInt,
+        defaultSourceType: json["default_source_type"].getStr,
+        defaultSourceName: json["default_source_name"].getStr,
+        filesCreated: json["files_created"].getInt,
+        createdOn: json["creation_date"].getStr.isoStringToDateTime
+    )
+
 method taskJsonToObj(this: TMClient, json: JsonNode): TMTask {.base.} =
     # Resolve optional values
     let containsViewPermission = json{"view_permission"}
@@ -435,7 +450,7 @@ method createSource*(
     ): Future[int] {.base, async.} =
     ## Creates a new source
     
-    # Put fields in body if present
+    # Put fields in body
     let body = %*{
         "name": name,
         "type": sourceType,
@@ -445,6 +460,31 @@ method createSource*(
     }
 
     let res = await this.request(HttpPost, "/sources/create", body)
+
+    return res["id"].getInt
+
+method createAccount*(
+        this: TMClient,
+        name: string,
+        email: string,
+        isAdmin: bool,
+        permissions: seq[string],
+        password: string,
+        defaultSource: int
+    ): Future[int] {.base, async.} =
+    ## Creates a new account
+    
+    # Put fields in body
+    let body = %*{
+        "name": name,
+        "email": email,
+        "admin": isAdmin,
+        "permissions": permissions.stringSeqToJsonArray,
+        "password": password,
+        "defaultSource": defaultSource
+    }
+
+    let res = await this.request(HttpPost, "/accounts/create", body)
 
     return res["id"].getInt
 
@@ -463,8 +503,10 @@ method fetchSelfAccountInfo*(this: TMClient): Future[TMSelfAccountInfo] {.base, 
         excludeOtherMedia: info["exclude_other_media"].getBool,
         excludeOtherLists: info["exclude_other_lists"].getBool,
         excludeOtherProcesses: info["exclude_other_processes"].getBool,
+        excludeOtherSources: info["exclude_other_sources"].getBool,
         maxUploadSize: info["max_upload"].getBiggestInt,
-        isApiToken: info["api_token"].getBool
+        isApiToken: info["api_token"].getBool,
+        defaultSource: info["default_source"].getInt
     )
     this.account = account
 
@@ -644,96 +686,25 @@ method fetchListsByPlaintextSearch*(
     return lists
 
 method fetchSources*(
-        this: TMClient,
-        offset: int,
-        limit: int,
-        order: TMSourceOrder = SourceCreatedOnDesc
-    ): Future[seq[TMSourceInfo]] {.base, async.} =
-    ## Fetches sources' info
-    
-    # Add parameters
-    let body = %*{
-        "offset": offset,
-        "limit": limit,
-        "order": order.ord
-    }
-
-    # Get sources
-    let sourceElems = (await this.request(HttpGet, "/sources", body))["sources"].getElems
-    var sources = newSeq[TMSourceInfo](sourceElems.len)
-    for i, source in sourceElems:
-        sources[i] = this.sourceInfoJsonToObj(source)
-    
-    return sources
-
-method fetchSourcesByPlaintextSearch*(
-        this: TMClient,
-        query: string,
-        offset: int,
-        limit: int,
-        order: TMSourceOrder = SourceCreatedOnDesc
-    ): Future[seq[TMSourceInfo]] {.base, async.} =
-    ## Fetches sources' info by the specified plaintext search query
-    
-    # Add parameters
-    let body = %*{
-        "query": query,
-        "offset": offset,
-        "limit": limit,
-        "order": order.ord
-    }
-
-    # Get sources
-    let sourceElems = (await this.request(HttpGet, "/sources", body))["sources"].getElems
-    var sources = newSeq[TMSourceInfo](sourceElems.len)
-    for i, source in sourceElems:
-        sources[i] = this.sourceInfoJsonToObj(source)
-    
-    return sources
-
-method fetchSourcesByCreator*(
     this: TMClient,
-        creator: int,
+        creator: Option[int] = none[int](),
+        query: Option[string] = none[string](),
         offset: int,
         limit: int,
         order: TMSourceOrder = SourceCreatedOnDesc
     ): Future[seq[TMSourceInfo]] {.base, async.} =
-    ## Fetches sources' info by the specified creator ID
+    ## Fetches all sources, optionally returning only sources with the specified creator, and optionally by the specified plaintext search query
     
-    # Add parameters
+    # Figure out which parameters need to be added
     let body = %*{
-        "creator": creator,
         "offset": offset,
         "limit": limit,
         "order": order.ord
     }
-
-    # Get sources
-    let sourceElems = (await this.request(HttpGet, "/sources", body))["sources"].getElems
-    var sources = newSeq[TMSourceInfo](sourceElems.len)
-    for i, source in sourceElems:
-        sources[i] = this.sourceInfoJsonToObj(source)
-    
-    return sources
-
-method fetchSourcesByCreatorAndPlaintextSearch*(
-    this: TMClient,
-        creator: int,
-        query: string,
-        offset: int,
-        limit: int,
-        order: TMSourceOrder = SourceCreatedOnDesc
-    ): Future[seq[TMSourceInfo]] {.base, async.} =
-    ## Fetches sources' info by the specified creator ID and plaintext search query
-    
-    # Add parameters
-    let body = %*{
-        "creator": creator,
-        "query": query,
-        "offset": offset,
-        "limit": limit,
-        "order": order.ord
-    }
+    if creator.isSome:
+        body.add("creator", newJInt(creator.get))
+    if query.isSome:
+        body.add("query", newJString(query.get))
 
     # Get sources
     let sourceElems = (await this.request(HttpGet, "/sources", body))["sources"].getElems
@@ -779,6 +750,36 @@ method fetchTaskById*(this: TMClient, id: int): Future[TMTask] {.base, async.} =
     ## Fetches the task with the specified ID
     
     return this.taskJsonToObj(await this.request(HttpGet, "/task/"&($id)))
+
+method fetchAccounts*(
+        this: TMClient,
+        query: Option[string],
+        offset: int,
+        limit: int,
+        order: TMAccountOrder = AccountCreatedOnDesc
+    ): Future[seq[TMAccount]] {.base, async.} =
+    ## Fetches all lists, optionally returning only lists of the specified type, and optionally causing lists to contain whether they contain the specified media file by ID
+    
+    # Figure out which parameters need to be added
+    let body = %*{
+        "offset": offset,
+        "limit": limit
+    }
+    if query.isSome:
+        body.add("query", newJString(query.get))
+
+    # Get accounts
+    let accountElems = (await this.request(HttpGet, "/accounts", body))["accounts"].getElems
+    var accounts = newSeq[TMAccount](accountElems.len)
+    for i, account in accountElems:
+        accounts[i] = this.accountJsonToObj(account)
+    
+    return accounts
+
+method fetchAccountById*(this: TMClient, id: int): Future[TMAccount] {.base, async.} =
+    ## Fetches the account with the specified ID
+    
+    return this.accountJsonToObj(await this.request(HttpGet, "/account/"&($id)))
 
 method editFile*(
         this: TMClient,
@@ -882,6 +883,78 @@ method editSource*(
 
     discard await this.request(HttpPost, "/source/"&($id)&"/edit", body)
 
+method editSelfAccount*(
+        this: TMClient,
+        currentPassword: Option[string] = none[string](),
+        name: Option[string] = none[string](),
+        email: Option[string] = none[string](),
+        password: Option[string] = none[string](),
+        defaultSource: Option[int] = none[int](),
+        excludeTags: Option[seq[string]] = none[seq[string]](),
+        excludeOtherMedia: Option[bool] = none[bool](),
+        excludeOtherLists: Option[bool] = none[bool](),
+        excludeOtherTags: Option[bool] = none[bool](),
+        excludeOtherProcesses: Option[bool] = none[bool](),
+        excludeOtherSources: Option[bool] = none[bool]()
+    ): Future[void] {.base, async.} =
+    ## Edits the client's account (currentPassword is required if changing email or password)
+    
+    # Put fields in body if present
+    let body = newJObject()
+    if currentPassword.isSome:
+        body.add("currentPassword", newJString(currentPassword.get))
+    if name.isSome:
+        body.add("name", newJString(name.get))
+    if email.isSome:
+        body.add("email", newJString(email.get))
+    if password.isSome:
+        body.add("password", newJString(password.get))
+    if defaultSource.isSome:
+        body.add("defaultSource", newJInt(defaultSource.get))
+    if excludeTags.isSome:
+        body.add("excludeTags", excludeTags.get.stringSeqToJsonArray)
+    if excludeOtherMedia.isSome:
+        body.add("excludeOtherMedia", newJBool(excludeOtherMedia.get))
+    if excludeOtherLists.isSome:
+        body.add("excludeOtherLists", newJBool(excludeOtherLists.get))
+    if excludeOtherTags.isSome:
+        body.add("excludeOtherTags", newJBool(excludeOtherTags.get))
+    if excludeOtherProcesses.isSome:
+        body.add("excludeOtherProcesses", newJBool(excludeOtherProcesses.get))
+    if excludeOtherSources.isSome:
+        body.add("excludeOtherSources", newJBool(excludeOtherSources.get))
+
+    discard await this.request(HttpPost, "/account/self/edit", body)
+
+method editAccount*(
+        this: TMClient,
+        id: int,
+        name: Option[string] = none[string](),
+        email: Option[string] = none[string](),
+        permissions: Option[seq[string]] = none[seq[string]](),
+        isAdmin: Option[bool] = none[bool](),
+        password: Option[string] = none[string](),
+        defaultSource: Option[int] = none[int]()
+    ): Future[void] {.base, async.} =
+    ## Edits an account
+    
+    # Put fields in body if present
+    let body = newJObject()
+    if name.isSome:
+        body.add("name", newJString(name.get))
+    if email.isSome:
+        body.add("email", newJString(email.get))
+    if permissions.isSome:
+        body.add("permissions", permissions.get.stringSeqToJsonArray)
+    if isAdmin.isSome:
+        body.add("admin", newJBool(isAdmin.get))
+    if password.isSome:
+        body.add("password", newJString(password.get))
+    if defaultSource.isSome:
+        body.add("defaultSource", newJInt(defaultSource.get))
+
+    discard await this.request(HttpPost, "/account/"&($id)&"/edit", body)
+
 method deleteFile*(this: TMClient, id: string): Future[void] {.base, async.} =
     ## Deletes a file
     
@@ -907,6 +980,11 @@ method deleteSource*(
     }
 
     discard await this.request(HttpPost, "/source/"&($id)&"/delete", body)
+
+method deleteAccount*(this: TMClient, id: int): Future[void] {.base, async.} =
+    ## Deletes an account
+    
+    discard await this.request(HttpPost, "/source/"&($id)&"/delete")
 
 method addFileToList*(this: TMClient, file: string, list: string): Future[void] {.base, async.} =
     ## Adds a media file to a list

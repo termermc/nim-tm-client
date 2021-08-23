@@ -52,6 +52,16 @@ type
         SourceNameDesc = 3,
         SourceTypeAsc = 4,
         SourceTypeDesc = 5
+
+    TMAccountOrder* = enum
+        ## Enum of orders that accounts cna be returned in
+        
+        AccountCreatedOnDesc = 0,
+        AccountCreatedOnAsc = 1,
+        AccountNameAsc = 2,
+        AccountNameDesc = 3,
+        AccountEmailAsc = 4,
+        AccountEmailDesc = 5
     
     TMTaskProgressType* = enum
         ## Enum of task progress display types

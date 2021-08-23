@@ -5,7 +5,7 @@ author      = "Termer"
 description = "Asychronous TwineMedia API client library for Nim"
 license     = "MIT"
 
-installFiles = @["src/tm_client.nim"]
+installFiles = @["tm_client.nim"]
 
 # Dependencies
 

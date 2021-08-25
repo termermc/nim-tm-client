@@ -958,7 +958,7 @@ method editAccount*(
 method deleteFile*(this: TMClient, id: string): Future[void] {.base, async.} =
     ## Deletes a file
     
-    discard await this.request(HttpPost, "/file/"&id&"/delete")
+    discard await this.request(HttpPost, "/media/"&id&"/delete")
 
 method deleteList*(this: TMClient, id: string): Future[void] {.base, async.} =
     ## Deletes a list

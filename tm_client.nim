@@ -58,7 +58,7 @@ method idToDownloadUrl*(this: TMClient, id: string, filename: string = ""): stri
     ## Takes in a media file ID and optionally a filename and returns its download URL
 
     if filename.len > 0:
-        return this.rootUrl&"/download/"&id&"/"&filename
+        return this.rootUrl&"/download/"&id&"/"&encodeUrl(filename)
     else:
         return this.rootUrl&"/download/"&id
 

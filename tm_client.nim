@@ -58,7 +58,7 @@ method idToDownloadUrl*(this: TMClient, id: string, filename: string = ""): stri
     ## Takes in a media file ID and optionally a filename and returns its download URL
 
     if filename.len > 0:
-        return this.rootUrl&"/download/"&id&"/"&encodeUrl(filename)
+        return this.rootUrl&"/download/"&id&"/"&encodeUrl(filename, false)
     else:
         return this.rootUrl&"/download/"&id
 
@@ -359,11 +359,11 @@ method uploadFile*(
         ("Authorization", "Bearer "&this.token)
     ]
     if name.isSome:
-        headers.add(("X-FILE-NAME", encodeUrl(name.get)))
+        headers.add(("X-FILE-NAME", encodeUrl(name.get, false)))
     if description.isSome:
-        headers.add(("X-FILE-DESCRIPTION", encodeUrl(description.get)))
+        headers.add(("X-FILE-DESCRIPTION", encodeUrl(description.get, false)))
     if tags.isSome:
-        headers.add(("X-FILE-TAGS", encodeUrl($tags.get.stringSeqToJsonArray)))
+        headers.add(("X-FILE-TAGS", encodeUrl($tags.get.stringSeqToJsonArray, false)))
     if noThumbnail:
         headers.add(("X-NO-THUMBNAIL", "true"))
     if doNotProcess:

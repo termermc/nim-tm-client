@@ -526,12 +526,14 @@ method fetchMediaById*(this: TMClient, id: string): Future[TMMedia] {.base, asyn
 
     return this.mediaJsonToObj(await this.request(HttpGet, "/media/"&id))
 
-method fetchMedia*(this: TMClient, offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
+method fetchMedia*(this: TMClient, offset: int = 0, limit: int = 100, mime: string = "%", order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
     ## Fetches all media
+    ## Provided MIME can use % as a wildcard character
     
     let files = (await this.request(HttpGet, "/media", %*{
         "offset": offset,
         "limit": limit,
+        "mime": mime,
         "order": order.ord
     }))["files"].getElems
     var res = newSeq[TMMedia](files.len)
@@ -549,6 +551,7 @@ method fetchMediaByPlaintextSearch*(
         searchTags: bool = true,
         offset: int = 0,
         limit: int = 100,
+        mime: string = "%",
         order: TMMediaOrder = MediaCreatedOnDesc
     ): Future[seq[TMMedia]] {.base, async.} =
     ## Fetches all media that matches the specified plaintext search query
@@ -561,6 +564,7 @@ method fetchMediaByPlaintextSearch*(
         "searchTags": $searchTags,
         "offset": offset,
         "limit": limit,
+        "mime": mime,
         "order": order.ord
     }))["files"].getElems
     var res = newSeq[TMMedia](files.len)
@@ -571,6 +575,7 @@ method fetchMediaByPlaintextSearch*(
 
 method fetchMediaByTags*(this: TMClient, tags: seq[string], excludeTags: seq[string] = @[], offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
     ## Fetches all media that contain the specified tags (and don't contain the specified excluded tags)
+    ## Provided MIME can use % as a wildcard character
     
     let files = (await this.request(HttpGet, "/media/tags", %*{
         "tags": stringSeqToJsonArray(tags),

@@ -1,6 +1,6 @@
 # Package
 
-version     = "0.1.3"
+version     = "0.1.4"
 author      = "Termer"
 description = "Asychronous TwineMedia API client library for Nim"
 license     = "MIT"

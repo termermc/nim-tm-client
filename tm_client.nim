@@ -1,18 +1,7 @@
 ## Module that provides an asynchronous client for TwineMedia and utilities for interacting with it
 
-import json
-import strutils
-import mimetypes
-import httpclient
-import asyncdispatch
-import cgi
-import options
-import times
-
-import tm_client/private/enums
-import tm_client/private/exceptions
-import tm_client/private/objects
-import tm_client/private/utils
+import std/[json, strutils, mimetypes, httpclient, asyncdispatch, cgi, options, times]
+import tm_client/[enums, exceptions, objects, utils]
 
 proc hasPermission*(perms: seq[string], permission: string): bool =
     ## Returns whether the specified permission is in the provided array of permissions
@@ -38,14 +27,7 @@ proc hasPermission*(perms: seq[string], permission: string): bool =
                 if result:
                     break
 
-type TMClient* = ref object of RootObj
-    ## Stores client credentials and information
-
-    rootUrl*: string
-    token*: string
-    account*: TMSelfAccountInfo
-
-method hasPermission*(this: TMClient, permission: string): bool {.base.} =
+proc hasPermission*(this: ref TMClient, permission: string): bool =
     ## Returns whether the account associated with this client has the specified permission.
     ## Requires that fetchSelfAccountInfo(client) has been called on this client at least once prior.
     
@@ -54,7 +36,7 @@ method hasPermission*(this: TMClient, permission: string): bool {.base.} =
     else:
         return this.account.permissions.hasPermission(permission)
 
-method idToDownloadUrl*(this: TMClient, id: string, filename: string = ""): string {.base.} =
+proc idToDownloadUrl*(this: ref TMClient, id: string, filename: string = ""): string =
     ## Takes in a media file ID and optionally a filename and returns its download URL
 
     if filename.len > 0:
@@ -62,12 +44,12 @@ method idToDownloadUrl*(this: TMClient, id: string, filename: string = ""): stri
     else:
         return this.rootUrl&"/download/"&id
 
-method idToThumbnailUrl*(this: TMClient, id: string): string {.base.} =
+proc idToThumbnailUrl*(this: ref TMClient, id: string): string =
     ## Takes in a media file ID and returns its thumbnail URL (URL will only work if the media file has a thumbnail)
 
     return this.rootUrl&"/thumbnail/"&id
 
-method mediaJsonToObj(this: TMClient, json: JsonNode): TMMedia {.base.} =
+proc mediaJsonToObj(this: ref TMClient, json: JsonNode): TMMedia =
     # Pull out some data that will be referenced more than once
     let id = json["id"].getStr
     let filename = json["filename"].getStr
@@ -108,7 +90,7 @@ method mediaJsonToObj(this: TMClient, json: JsonNode): TMMedia {.base.} =
         parent: parent
     )
 
-method listJsonToObj(this: TMClient, json: JsonNode): TMList {.base.} =
+proc listJsonToObj(this: ref TMClient, json: JsonNode): TMList =
     # Resolve optional values
     let tagsJson = json{"source_tags"}
     let tags = if tagsJson == nil or tagsJson.kind == JNull:
@@ -176,7 +158,7 @@ method listJsonToObj(this: TMClient, json: JsonNode): TMList {.base.} =
         containsMedia: containsMedia
     )
 
-method sourceJsonToObj(this: TMClient, json: JsonNode): TMSource {.base.} =
+proc sourceJsonToObj(this: ref TMClient, json: JsonNode): TMSource =
     # Resolve optional values
     let containsRemainingStorage = json{"remaining_storage"}
     let remainingStorage = if containsRemainingStorage == nil or containsRemainingStorage.kind == JNull:
@@ -199,7 +181,7 @@ method sourceJsonToObj(this: TMClient, json: JsonNode): TMSource {.base.} =
         createdOn: json["created_on"].getStr.isoStringToDateTime,
     )
 
-method sourceInfoJsonToObj(this: TMClient, json: JsonNode): TMSourceInfo {.base.} =
+proc sourceInfoJsonToObj(this: ref TMClient, json: JsonNode): TMSourceInfo =
     # Create object
     return TMSourceInfo(
         id: json["id"].getInt,
@@ -212,7 +194,7 @@ method sourceInfoJsonToObj(this: TMClient, json: JsonNode): TMSourceInfo {.base.
         createdOn: json["created_on"].getStr.isoStringToDateTime,
     )
 
-method sourceTypeJsonToObj(this: TMClient, json: JsonNode): TMSourceType {.base.} =
+proc sourceTypeJsonToObj(this: ref TMClient, json: JsonNode): TMSourceType =
     # Create object
     return TMSourceType(
         sourceType: json["type"].getStr,
@@ -221,7 +203,7 @@ method sourceTypeJsonToObj(this: TMClient, json: JsonNode): TMSourceType {.base.
         schema: json["schema"]
     )
 
-method accountJsonToObj(this: TMClient, json: JsonNode): TMAccount {.base.} =
+proc accountJsonToObj(this: ref TMClient, json: JsonNode): TMAccount =
     # Create object
     return TMAccount(
         id: json["id"].getInt,
@@ -236,7 +218,7 @@ method accountJsonToObj(this: TMClient, json: JsonNode): TMAccount {.base.} =
         createdOn: json["creation_date"].getStr.isoStringToDateTime
     )
 
-method taskJsonToObj(this: TMClient, json: JsonNode): TMTask {.base.} =
+proc taskJsonToObj(this: ref TMClient, json: JsonNode): TMTask =
     # Resolve optional values
     let containsViewPermission = json{"view_permission"}
     let viewPermission = if containsViewPermission == nil or containsViewPermission.kind == JNull:
@@ -281,7 +263,7 @@ method taskJsonToObj(this: TMClient, json: JsonNode): TMTask {.base.} =
         createdOn: json["created_on"].getStr.isoStringToDateTime,
     )
 
-method handleApiResponse(this: TMClient, http: AsyncHttpClient, httpRes: AsyncResponse): Future[JsonNode] {.base, async.} =
+proc handleApiResponse(this: ref TMClient, http: AsyncHttpClient, httpRes: AsyncResponse): Future[JsonNode] {.async.} =
     ## Takes in an HTTP response, validates it, and returns the body as JSON
 
     # Make sure 200 status is returned
@@ -316,7 +298,7 @@ method handleApiResponse(this: TMClient, http: AsyncHttpClient, httpRes: AsyncRe
         http.close()
         raise newException(BadStatusCodeError, "API returned HTTP status "&httpRes.status)
 
-method request*(this: TMClient, httpMethod: HttpMethod, path: string, data: JsonNode = %* {}): Future[JsonNode] {.base, async.} =
+proc request*(this: ref TMClient, httpMethod: HttpMethod, path: string, data: JsonNode = %* {}): Future[JsonNode] {.async.} =
     ## Performs a request with a relative API path (must start with "/") and optionally data to be sent as either query parameters or POST body
 
     # Work out headers and URL for request
@@ -341,8 +323,8 @@ method request*(this: TMClient, httpMethod: HttpMethod, path: string, data: Json
     
     return await this.handleApiResponse(http, httpRes)
 
-method uploadFile*(
-        this: TMClient,
+proc uploadFile*(
+        this: ref TMClient,
         path: string,
         name: Option[string] = none[string](),
         description: Option[string] = none[string](),
@@ -351,7 +333,7 @@ method uploadFile*(
         doNotProcess: bool = false,
         ignoreHash: bool = false,
         source: Option[int] = none[int](),
-    ): Future[string] {.base, async.} =
+    ): Future[string] {.async.} =
     ## Uploads a file and returns its ID
     
     # Setup headers
@@ -390,7 +372,7 @@ method uploadFile*(
     # Return new file's ID
     return res["id"].getStr
 
-method createStandardList*(this: TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[string] {.base, async.} =
+proc createStandardList*(this: ref TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[string] {.async.} =
     ## Create a new standard list
     
     let res = await this.request(HttpPost, "/lists/create", %*{
@@ -402,8 +384,8 @@ method createStandardList*(this: TMClient, id: string, name: string, description
 
     return res["id"].getStr
 
-method createAutomaticallyPopulatedList*(
-        this: TMClient,
+proc createAutomaticallyPopulatedList*(
+        this: ref TMClient,
         name: string,
         description: string,
         visibility: TMListVisibility,
@@ -413,7 +395,7 @@ method createAutomaticallyPopulatedList*(
         sourceCreatedAfter: Option[DateTime] = none[DateTime](),
         sourceMime: Option[string] = none[string](),
         showAllUserFiles: Option[bool] = none[bool]()
-    ): Future[string] {.base, async.} =
+    ): Future[string] {.async.} =
     ## Creates a new automatically populated list
     
     # Put fields in body if present
@@ -440,14 +422,14 @@ method createAutomaticallyPopulatedList*(
 
     return res["id"].getStr
 
-method createSource*(
-        this: TMClient,
+proc createSource*(
+        this: ref TMClient,
         name: string,
         sourceType: string,
         config: JsonNode,
         testConfig: bool,
         isGlobal: bool
-    ): Future[int] {.base, async.} =
+    ): Future[int] {.async.} =
     ## Creates a new source
     
     # Put fields in body
@@ -463,15 +445,15 @@ method createSource*(
 
     return res["id"].getInt
 
-method createAccount*(
-        this: TMClient,
+proc createAccount*(
+        this: ref TMClient,
         name: string,
         email: string,
         isAdmin: bool,
         permissions: seq[string],
         password: string,
         defaultSource: int
-    ): Future[int] {.base, async.} =
+    ): Future[int] {.async.} =
     ## Creates a new account
     
     # Put fields in body
@@ -488,7 +470,7 @@ method createAccount*(
 
     return res["id"].getInt
 
-method fetchSelfAccountInfo*(this: TMClient): Future[TMSelfAccountInfo] {.base, async.} =
+proc fetchSelfAccountInfo*(this: ref TMClient): Future[TMSelfAccountInfo] {.async.} =
     ## Fetches this client's account info (and stores in the client account property)
 
     let info = await this.request(HttpGet, "/account/info")
@@ -512,7 +494,7 @@ method fetchSelfAccountInfo*(this: TMClient): Future[TMSelfAccountInfo] {.base, 
 
     return account
 
-method fetchInstanceInfo*(this: TMClient): Future[TMInstanceInfo] {.base, async.} =
+proc fetchInstanceInfo*(this: ref TMClient): Future[TMInstanceInfo] {.async.} =
     ## Fetches information about this TwineMedia instance
 
     let info = await this.request(HttpGet, "/info")
@@ -521,12 +503,12 @@ method fetchInstanceInfo*(this: TMClient): Future[TMInstanceInfo] {.base, async.
         apiVersions: info["api_versions"].jsonArrayToStringSeq
     )
 
-method fetchMediaById*(this: TMClient, id: string): Future[TMMedia] {.base, async.} =
+proc fetchMediaById*(this: ref TMClient, id: string): Future[TMMedia] {.async.} =
     ## Fetches the media file with the specified ID, otherwises raises MediaNotFoundError
 
     return this.mediaJsonToObj(await this.request(HttpGet, "/media/"&id))
 
-method fetchMedia*(this: TMClient, offset: int = 0, limit: int = 100, mime: string = "%", order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
+proc fetchMedia*(this: ref TMClient, offset: int = 0, limit: int = 100, mime: string = "%", order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.async.} =
     ## Fetches all media
     ## Provided MIME can use % as a wildcard character
     
@@ -542,8 +524,8 @@ method fetchMedia*(this: TMClient, offset: int = 0, limit: int = 100, mime: stri
     
     return res
 
-method fetchMediaByPlaintextSearch*(
-        this: TMClient,
+proc fetchMediaByPlaintextSearch*(
+        this: ref TMClient,
         query: string,
         searchNames: bool = true,
         searchFilenames: bool = true,
@@ -553,7 +535,7 @@ method fetchMediaByPlaintextSearch*(
         limit: int = 100,
         mime: string = "%",
         order: TMMediaOrder = MediaCreatedOnDesc
-    ): Future[seq[TMMedia]] {.base, async.} =
+    ): Future[seq[TMMedia]] {.async.} =
     ## Fetches all media that matches the specified plaintext search query
     
     let files = (await this.request(HttpGet, "/media/search", %*{
@@ -573,7 +555,7 @@ method fetchMediaByPlaintextSearch*(
     
     return res
 
-method fetchMediaByTags*(this: TMClient, tags: seq[string], excludeTags: seq[string] = @[], offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
+proc fetchMediaByTags*(this: ref TMClient, tags: seq[string], excludeTags: seq[string] = @[], offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.async.} =
     ## Fetches all media that contain the specified tags (and don't contain the specified excluded tags)
     ## Provided MIME can use % as a wildcard character
     
@@ -590,7 +572,7 @@ method fetchMediaByTags*(this: TMClient, tags: seq[string], excludeTags: seq[str
     
     return res
 
-method fetchMediaByList*(this: TMClient, list: string, offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.base, async.} =
+proc fetchMediaByList*(this: ref TMClient, list: string, offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.async.} =
     ## Fetches all media in the specified list
     
     let files = (await this.request(HttpGet, "/media/list/"&list, %*{
@@ -604,7 +586,7 @@ method fetchMediaByList*(this: TMClient, list: string, offset: int = 0, limit: i
     
     return res
 
-method fetchTags*(this: TMClient, query: string = "", offset: int = 0, limit: int = 100, order: TMTagOrder = TagNameAsc): Future[seq[TMTag]] {.base, async.} =
+proc fetchTags*(this: ref TMClient, query: string = "", offset: int = 0, limit: int = 100, order: TMTagOrder = TagNameAsc): Future[seq[TMTag]] {.async.} =
     ## Fetchs all tags (optionally matching the specified query, using "%" as a wildcard)
     
     let tagElems = (await this.request(HttpGet, "/tags", %*{
@@ -621,19 +603,19 @@ method fetchTags*(this: TMClient, query: string = "", offset: int = 0, limit: in
 
     return tags
 
-method fetchListById*(this: TMClient, id: string): Future[TMList] {.base, async.} =
+proc fetchListById*(this: ref TMClient, id: string): Future[TMList] {.async.} =
     ## Fetches a list's info by its ID
     
     return this.listJsonToObj(await this.request(HttpGet, "/list/"&id))
 
-method fetchLists*(
-        this: TMClient,
+proc fetchLists*(
+        this: ref TMClient,
         listType: Option[TMListType] = none[TMListType](),
         containsMedia: Option[string] = none[string](),
         offset: int = 0,
         limit: int = 100,
         order: TMListOrder = ListCreatedOnDesc
-    ): Future[seq[TMList]] {.base, async.} =
+    ): Future[seq[TMList]] {.async.} =
     ## Fetches all lists, optionally returning only lists of the specified type, and optionally causing lists to contain whether they contain the specified media file by ID
     
     # Figure out which parameters need to be added
@@ -655,8 +637,8 @@ method fetchLists*(
     
     return lists
 
-method fetchListsByPlaintextSearch*(
-        this: TMClient,
+proc fetchListsByPlaintextSearch*(
+        this: ref TMClient,
         query: string,
         searchNames: bool = true,
         searchDescriptions: bool = true,
@@ -665,7 +647,7 @@ method fetchListsByPlaintextSearch*(
         offset: int = 0,
         limit: int = 100,
         order: TMListOrder = ListCreatedOnDesc
-    ): Future[seq[TMList]] {.base, async.} =
+    ): Future[seq[TMList]] {.async.} =
     ## Fetches lists by the specified plaintext search query, optionally returning only lists of the specified type, and optionally causing lists to contain whether they contain the specified media file by ID
     
     # Figure out which parameters need to be added
@@ -690,14 +672,14 @@ method fetchListsByPlaintextSearch*(
     
     return lists
 
-method fetchSources*(
-    this: TMClient,
+proc fetchSources*(
+    this: ref TMClient,
         creator: Option[int] = none[int](),
         query: Option[string] = none[string](),
         offset: int,
         limit: int,
         order: TMSourceOrder = SourceCreatedOnDesc
-    ): Future[seq[TMSourceInfo]] {.base, async.} =
+    ): Future[seq[TMSourceInfo]] {.async.} =
     ## Fetches all sources, optionally returning only sources with the specified creator, and optionally by the specified plaintext search query
     
     # Figure out which parameters need to be added
@@ -719,12 +701,12 @@ method fetchSources*(
     
     return sources
 
-method fetchSourceById*(this: TMClient, id: int): Future[TMSource] {.base, async.} =
+proc fetchSourceById*(this: ref TMClient, id: int): Future[TMSource] {.async.} =
     ## Fetches the source with the specified ID
     
     return this.sourceJsonToObj(await this.request(HttpGet, "/source/"&($id)))
 
-method fetchSourceTypes*(this: TMClient): Future[seq[TMSourceType]] {.base, async.} =
+proc fetchSourceTypes*(this: ref TMClient): Future[seq[TMSourceType]] {.async.} =
     ## Fetches all available source types
     
     # Get types
@@ -735,12 +717,12 @@ method fetchSourceTypes*(this: TMClient): Future[seq[TMSourceType]] {.base, asyn
     
     return types
 
-method fetchSourceType*(this: TMClient, sourceType: string): Future[TMSourceType] {.base, async.} =
+proc fetchSourceType*(this: ref TMClient, sourceType: string): Future[TMSourceType] {.async.} =
     ## Fetches a specific source type's info
     
     return this.sourceTypeJsonToObj(await this.request(HttpGet, "/sources/type/"&sourceType))
 
-method fetchTasks*(this: TMClient): Future[seq[TMTask]] {.base, async.} =
+proc fetchTasks*(this: ref TMClient): Future[seq[TMTask]] {.async.} =
     ## Fetches all tasks visible to the client
 
     # Get tasks
@@ -751,18 +733,18 @@ method fetchTasks*(this: TMClient): Future[seq[TMTask]] {.base, async.} =
     
     return tasks
 
-method fetchTaskById*(this: TMClient, id: int): Future[TMTask] {.base, async.} =
+proc fetchTaskById*(this: ref TMClient, id: int): Future[TMTask] {.async.} =
     ## Fetches the task with the specified ID
     
     return this.taskJsonToObj(await this.request(HttpGet, "/task/"&($id)))
 
-method fetchAccounts*(
-        this: TMClient,
+proc fetchAccounts*(
+        this: ref TMClient,
         query: Option[string],
         offset: int,
         limit: int,
         order: TMAccountOrder = AccountCreatedOnDesc
-    ): Future[seq[TMAccount]] {.base, async.} =
+    ): Future[seq[TMAccount]] {.async.} =
     ## Fetches all lists, optionally returning only lists of the specified type, and optionally causing lists to contain whether they contain the specified media file by ID
     
     # Figure out which parameters need to be added
@@ -781,20 +763,20 @@ method fetchAccounts*(
     
     return accounts
 
-method fetchAccountById*(this: TMClient, id: int): Future[TMAccount] {.base, async.} =
+proc fetchAccountById*(this: ref TMClient, id: int): Future[TMAccount] {.async.} =
     ## Fetches the account with the specified ID
     
     return this.accountJsonToObj(await this.request(HttpGet, "/account/"&($id)))
 
-method editFile*(
-        this: TMClient,
+proc editFile*(
+        this: ref TMClient,
         id: string,
         name: Option[string] = none[string](),
         filename: Option[string] = none[string](),
         description: Option[string] = none[string](),
         tags: Option[seq[string]] = none[seq[string]](),
         creator: Option[int] = none[int]()
-    ): Future[void] {.base, async.} =
+    ): Future[void] {.async.} =
     ## Edits the file with the specified ID, changing properties if provided (name, filename, description, tags)
 
     # Figure out which parameters need to be added
@@ -813,7 +795,7 @@ method editFile*(
     # Edit file
     discard await this.request(HttpPost, "/media/"&id&"/edit", body)
 
-method editListAsStandard*(this: TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[void] {.base, async.} =
+proc editListAsStandard*(this: ref TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[void] {.async.} =
     ## Edits a list as a standard list (calling this on an automatically populated list will convert it into a standard list)
     
     discard await this.request(HttpPost, "/list/"&id&"/edit", %*{
@@ -823,8 +805,8 @@ method editListAsStandard*(this: TMClient, id: string, name: string, description
         "visibility": visibility.ord
     })
 
-method editListAsAutomaticallyPopulated*(
-        this: TMClient,
+proc editListAsAutomaticallyPopulated*(
+        this: ref TMClient,
         id: string,
         name: string,
         description: string,
@@ -835,7 +817,7 @@ method editListAsAutomaticallyPopulated*(
         sourceCreatedAfter: Option[DateTime] = none[DateTime](),
         sourceMime: Option[string] = none[string](),
         showAllUserFiles: Option[bool] = none[bool]()
-    ): Future[void] {.base, async.} =
+    ): Future[void] {.async.} =
     ## Edits a list as an automatically populated list (calling this on a standard list will convert it into an automatically populated list)
     
     # Put fields in body if present
@@ -860,8 +842,8 @@ method editListAsAutomaticallyPopulated*(
     
     discard await this.request(HttpPost, "/list/"&id&"/edit", body)
 
-method editSource*(
-        this: TMClient,
+proc editSource*(
+        this: ref TMClient,
         id: int,
         name: Option[string] = none[string](),
         config: Option[JsonNode] = none[JsonNode](),
@@ -869,7 +851,7 @@ method editSource*(
         isGlobal: Option[bool] = none[bool](),
         testConfig: bool = false,
         forceEdit: bool = false
-    ): Future[void] {.base, async.} =
+    ): Future[void] {.async.} =
     ## Edits a source
     
     # Put fields in body if present
@@ -888,8 +870,8 @@ method editSource*(
 
     discard await this.request(HttpPost, "/source/"&($id)&"/edit", body)
 
-method editSelfAccount*(
-        this: TMClient,
+proc editSelfAccount*(
+        this: ref TMClient,
         currentPassword: Option[string] = none[string](),
         name: Option[string] = none[string](),
         email: Option[string] = none[string](),
@@ -901,7 +883,7 @@ method editSelfAccount*(
         excludeOtherTags: Option[bool] = none[bool](),
         excludeOtherProcesses: Option[bool] = none[bool](),
         excludeOtherSources: Option[bool] = none[bool]()
-    ): Future[void] {.base, async.} =
+    ): Future[void] {.async.} =
     ## Edits the client's account (currentPassword is required if changing email or password)
     
     # Put fields in body if present
@@ -931,8 +913,8 @@ method editSelfAccount*(
 
     discard await this.request(HttpPost, "/account/self/edit", body)
 
-method editAccount*(
-        this: TMClient,
+proc editAccount*(
+        this: ref TMClient,
         id: int,
         name: Option[string] = none[string](),
         email: Option[string] = none[string](),
@@ -940,7 +922,7 @@ method editAccount*(
         isAdmin: Option[bool] = none[bool](),
         password: Option[string] = none[string](),
         defaultSource: Option[int] = none[int]()
-    ): Future[void] {.base, async.} =
+    ): Future[void] {.async.} =
     ## Edits an account
     
     # Put fields in body if present
@@ -960,22 +942,22 @@ method editAccount*(
 
     discard await this.request(HttpPost, "/account/"&($id)&"/edit", body)
 
-method deleteFile*(this: TMClient, id: string): Future[void] {.base, async.} =
+proc deleteFile*(this: ref TMClient, id: string): Future[void] {.async.} =
     ## Deletes a file
     
     discard await this.request(HttpPost, "/media/"&id&"/delete")
 
-method deleteList*(this: TMClient, id: string): Future[void] {.base, async.} =
+proc deleteList*(this: ref TMClient, id: string): Future[void] {.async.} =
     ## Deletes a list
     
     discard await this.request(HttpPost, "/list/"&id&"/delete")
 
-method deleteSource*(
-        this: TMClient,
+proc deleteSource*(
+        this: ref TMClient,
         id: int,
         forceDelete: bool = false,
         deleteContents: bool = false
-    ): Future[void] {.base, async.} =
+    ): Future[void] {.async.} =
     ## Deletes a source
     
     # Put fields in body
@@ -986,39 +968,43 @@ method deleteSource*(
 
     discard await this.request(HttpPost, "/source/"&($id)&"/delete", body)
 
-method deleteAccount*(this: TMClient, id: int): Future[void] {.base, async.} =
+proc deleteAccount*(this: ref TMClient, id: int): Future[void] {.async.} =
     ## Deletes an account
     
     discard await this.request(HttpPost, "/source/"&($id)&"/delete")
 
-method addFileToList*(this: TMClient, file: string, list: string): Future[void] {.base, async.} =
+proc addFileToList*(this: ref TMClient, file: string, list: string): Future[void] {.async.} =
     ## Adds a media file to a list
     
     discard await this.request(HttpPost, "/list/"&list&"/add/"&file)
 
-method removeFileFromList*(this: TMClient, file: string, list: string): Future[void] {.base, async.} =
+proc removeFileFromList*(this: ref TMClient, file: string, list: string): Future[void] {.async.} =
     ## Removes a media file from a list
     
     discard await this.request(HttpPost, "/list/"&list&"/remove/"&file)
 
-method cancelTask*(this: TMClient, id: int): Future[void] {.base, async.} =
+proc cancelTask*(this: ref TMClient, id: int): Future[void] {.async.} =
     ## Requests that the task with the specified ID be cancelled
     
     discard await this.request(HttpPost, "/task/"&($id)&"/cancel")
 
-proc createClientWithToken*(rootUrl: string, token: string): TMClient =
+proc newClientFromToken*(rootUrl: string, token: string): ref TMClient =
     ## Creates a TwineMedia client with the provided root URL and token.
     ## Does not fetch account information, call fetchSelfAccountInfo(client) to fetch or update it.
     
-    return TMClient(rootUrl: rootUrl.stripTrailingSlash, token: token)
+    var client: ref TMClient
+    new(client)
+    client.rootUrl = rootUrl.stripTrailingSlash
+    client.token = token
+    return client
 
-proc createAnonymousClient*(rootUrl: string): TMClient =
+proc newAnonymousClient*(rootUrl: string): ref TMClient =
     ## Creates a TwineMedia client the provided root URL, and a blank token
     ## Is only able to perform anonymous requests, such as fetchInstanceInfo
     
-    return TMClient(rootUrl: rootUrl.stripTrailingSlash, token: "")
+    return newClientFromToken(rootUrl, "")
 
-proc createClientWithEmail*(rootUrl: string, email: string, password: string): Future[TMClient] {.async.} =
+proc newClientFromCredentials*(rootUrl: string, email: string, password: string): Future[ref TMClient] {.async.} =
     ## Creates a TwineMedia client with the providede root URL, email, and password.
     ## Contacts the API to authenticate with email, and as such takes more time than creating a client with a token.
     ## Does not fetch account information, call fetchSelfAccountInfo(client) to fetch or update it.
@@ -1042,7 +1028,7 @@ proc createClientWithEmail*(rootUrl: string, email: string, password: string): F
 
         # Create client or handle bad status
         if status == "success":
-            result = TMClient(rootUrl: root, token: json["token"].getStr)
+            result = newClientFromToken(root, json["token"].getStr)
             http.close()
         elif status == "error":
             let msg = json["error"].getStr("No error field in response")

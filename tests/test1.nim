@@ -7,14 +7,14 @@
 
 import unittest
 
-import tm_client
+import ".."/tm_client
 import asyncdispatch
 
 const rootUrl = "https://static.termer.net"
 
 test "Can request info":
-    let client = createAnonymousClient(rootUrl)
+    let client = newAnonymousClient(rootUrl)
 
-    discard waitFor client.fetchInstanceInfo()
+    echo waitFor client.fetchInstanceInfo()
 
     check true

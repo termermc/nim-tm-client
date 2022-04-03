@@ -7,7 +7,15 @@ import json
 import enums
 
 type
-    TMSelfAccountInfo* = object
+    TMClient* = object of RootObj
+        ## TwineMedia client.
+        ## Stores root URL, authentication token, and optionally account information.
+
+        rootUrl*: string
+        token*: string
+        account*: TMSelfAccountInfo
+
+    TMSelfAccountInfo* = object of RootObj
         ## Stores info about the account associated with a TwineMedia client
 
         id*: int
@@ -25,7 +33,7 @@ type
         isApiToken*: bool
         defaultSource*: int
 
-    TMMedia* = object
+    TMMedia* = object of RootObj
         ## Stores information about a media file.
         ## Note: "parent" will be empty if the media file has no parent, but if it does, it will contain exactly 1 TMMedia object.
             
@@ -52,19 +60,19 @@ type
         parent*: seq[TMMedia]
         children*: seq[TMMedia]
 
-    TMInstanceInfo* = object
+    TMInstanceInfo* = object of RootObj
         ## Stores information about a TwineMedia instance
         
         version*: string
         apiVersions*: seq[string]
     
-    TMTag* = object
+    TMTag* = object of RootObj
         ## Stores information about a TwineMedia tag
         
         name*: string
         files*: int
     
-    TMList* = object
+    TMList* = object of RootObj
         ## Stores information about a TwineMedia list
         
         id*: string
@@ -85,7 +93,7 @@ type
         itemCount*: Option[int]
         containsMedia*: Option[bool]
     
-    TMSource* = object
+    TMSource* = object of RootObj
         ## Stores information about a TwineMedia source
         
         id*: int
@@ -101,7 +109,7 @@ type
         remainingStorage*: Option[int64]
         createdOn*: DateTime
     
-    TMSourceInfo* = object
+    TMSourceInfo* = object of RootObj
         ## Stores basic information about a TwineMedia source
         
         id*: int
@@ -113,7 +121,7 @@ type
         mediaCount*: int
         createdOn*: DateTime
     
-    TMSourceType* = object
+    TMSourceType* = object of RootObj
         ## Stores information about a TwineMedia source type
         
         sourceType*: string
@@ -121,7 +129,7 @@ type
         description*: string
         schema*: JsonNode
 
-    TMTask* = object
+    TMTask* = object of RootObj
         ## Stores information about a TwineMedia task
         
         id*: int
@@ -140,7 +148,7 @@ type
         isCancelling*: bool
         createdOn*: DateTime
     
-    TMAccount* = object
+    TMAccount* = object of RootObj
         ## Stores information about a TwineMedia account
         
         id*: int

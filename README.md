@@ -17,7 +17,7 @@ const token = "YOUR_TOKEN_HERE"
 
 proc main() {.async.} =
     # Create client
-    let client = createClientWithToken(root, token)
+    let client = newClientFromToken(root, token)
 
     # Optionally fetch client account info
     let info = await client.fetchSelfAccountInfo()
@@ -41,7 +41,7 @@ const password = "drowssap"
 
 proc main() {.async.} =
     # Create client with credentials
-    let client = await createClientWithEmail(root, email, password)
+    let client = await newClientFromCredentials(root, email, password)
 
     # Optionally fetch client account info
     let info = await client.fetchSelfAccountInfo()

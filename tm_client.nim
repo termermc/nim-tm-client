@@ -1,6 +1,6 @@
 ## Module that provides an asynchronous client for TwineMedia and utilities for interacting with it
 
-import std/[json, strutils, mimetypes, httpclient, asyncdispatch, cgi, options, times]
+import std/[json, strutils, mimetypes, httpclient, asyncdispatch, cgi, options, times, os]
 import tm_client/[enums, exceptions, objects, utils]
 
 proc hasPermission*(perms: seq[string], permission: string): bool =
@@ -329,6 +329,7 @@ proc uploadFile*(
         name: Option[string] = none[string](),
         description: Option[string] = none[string](),
         tags: Option[seq[string]] = none[seq[string]](),
+        mime: Option[string] = none[string](),
         noThumbnail: bool = false,
         doNotProcess: bool = false,
         ignoreHash: bool = false,
@@ -355,10 +356,16 @@ proc uploadFile*(
     if source.isSome:
         headers.add(("X-MEDIA-SOURCE", $source.get))
 
-    # Setup multipart data
-    let mimes = newMimetypes()
+    # Parse path and get mimetype
+    let (_, fname, fext) = splitFile(path)
+    let contentType = if mime.isSome:
+        mime.get()
+    else:
+        newMimetypes().getMimetype(fext, "application/octet-stream")
+    
+    # Construct multipart data
     let data = newMultipartData()
-    data.addFiles({ "file": path }, mimeDb = mimes)
+    data.add("file", path, fname&fext, contentType, useStream = true)
     
     # Create client
     let http = newAsyncHttpClient(headers = newHttpHeaders(headers))

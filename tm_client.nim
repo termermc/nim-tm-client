@@ -323,24 +323,26 @@ proc request*(this: ref TMClient, httpMethod: HttpMethod, path: string, data: Js
     
     return await this.handleApiResponse(http, httpRes)
 
-proc uploadFile*(
+proc upload(
         this: ref TMClient,
-        path: string,
+        pathOrData: string,
+        isFile: bool,
+        filename: string,
+        mime: string,
         name: Option[string] = none[string](),
         description: Option[string] = none[string](),
         tags: Option[seq[string]] = none[seq[string]](),
-        mime: Option[string] = none[string](),
         noThumbnail: bool = false,
         doNotProcess: bool = false,
         ignoreHash: bool = false,
-        source: Option[int] = none[int](),
+        source: Option[int] = none[int]()
     ): Future[string] {.async.} =
-    ## Uploads a file and returns its ID
+    ## Uploads a file or a string and returns its ID
     
     # Setup headers
-    var headers = @[
-        ("Authorization", "Bearer "&this.token)
-    ]
+    var headers = @{
+        "Authorization": "Bearer "&this.token
+    }
     if name.isSome:
         headers.add(("X-FILE-NAME", encodeUrl(name.get, false)))
     if description.isSome:
@@ -355,17 +357,10 @@ proc uploadFile*(
         headers.add(("X-IGNORE-HASH", "true"))
     if source.isSome:
         headers.add(("X-MEDIA-SOURCE", $source.get))
-
-    # Parse path and get mimetype
-    let (_, fname, fext) = splitFile(path)
-    let contentType = if mime.isSome:
-        mime.get()
-    else:
-        newMimetypes().getMimetype(fext, "application/octet-stream")
     
     # Construct multipart data
     let data = newMultipartData()
-    data.add("file", path, fname&fext, contentType, useStream = true)
+    data.add("file", pathOrData, filename, mime, useStream = isFile)
     
     # Create client
     let http = newAsyncHttpClient(headers = newHttpHeaders(headers))
@@ -378,6 +373,49 @@ proc uploadFile*(
 
     # Return new file's ID
     return res["id"].getStr
+
+proc uploadData*(
+        this: ref TMClient,
+        data: string,
+        filename: string,
+        mime: string,
+        name: Option[string] = none[string](),
+        description: Option[string] = none[string](),
+        tags: Option[seq[string]] = none[seq[string]](),
+        noThumbnail: bool = false,
+        doNotProcess: bool = false,
+        ignoreHash: bool = false,
+        source: Option[int] = none[int]()
+    ): Future[string] {.async.} =
+    ## Uploads a file or a string and returns its ID
+    
+    # Upload
+    return await this.upload(data, false, filename, mime, name, description, tags, noThumbnail, doNotProcess, ignoreHash, source)
+
+proc uploadFile*(
+        this: ref TMClient,
+        path: string,
+        filename: Option[string] = none[string](),
+        mime: Option[string] = none[string](),
+        name: Option[string] = none[string](),
+        description: Option[string] = none[string](),
+        tags: Option[seq[string]] = none[seq[string]](),
+        noThumbnail: bool = false,
+        doNotProcess: bool = false,
+        ignoreHash: bool = false,
+        source: Option[int] = none[int]()
+    ): Future[string] {.async.} =
+    ## Uploads a file and returns its ID
+    
+    # Parse filename and get MIME type
+    let (_, fname, fext) = splitFile(path)
+    let contentType = if mime.isSome:
+        mime.get()
+    else:
+        newMimetypes().getMimetype(fext, "application/octet-stream")
+    
+    # Upload
+    return await this.upload(path, true, fname&fext, contentType, name, description, tags, noThumbnail, doNotProcess, ignoreHash, source)
 
 proc createStandardList*(this: ref TMClient, id: string, name: string, description: string, visibility: TMListVisibility): Future[string] {.async.} =
     ## Create a new standard list

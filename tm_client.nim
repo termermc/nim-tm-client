@@ -600,7 +600,15 @@ proc fetchMediaByPlaintextSearch*(
     
     return res
 
-proc fetchMediaByTags*(this: ref TMClient, tags: seq[string], excludeTags: seq[string] = @[], offset: int = 0, limit: int = 100, order: TMMediaOrder = MediaCreatedOnDesc): Future[seq[TMMedia]] {.async.} =
+proc fetchMediaByTags*(
+        this: ref TMClient,
+        tags: seq[string],
+        excludeTags: seq[string] = @[],
+        offset: int = 0,
+        limit: int = 100,
+        mime: string = "%",
+        order: TMMediaOrder = MediaCreatedOnDesc
+    ): Future[seq[TMMedia]] {.async.} =
     ## Fetches all media that contain the specified tags (and don't contain the specified excluded tags)
     ## Provided MIME can use % as a wildcard character
     
@@ -609,6 +617,7 @@ proc fetchMediaByTags*(this: ref TMClient, tags: seq[string], excludeTags: seq[s
         "excludeTags": stringSeqToJsonArray(excludeTags),
         "offset": offset,
         "limit": limit,
+        "mime": mime,
         "order": order.ord
     }))["files"].getElems
     var res = newSeq[TMMedia](files.len)
